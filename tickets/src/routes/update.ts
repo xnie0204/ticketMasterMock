@@ -7,6 +7,8 @@ import {
   validationRequest,
 } from "@ticketingxnie/common";
 import { Ticket } from "../models/ticket";
+import { TicketUpdatedPublisher } from "../events/publishers/ticket-update-publish";
+import { natsWrapper } from "../nats-wrappers";
 const router = express.Router();
 
 router.put(
@@ -21,7 +23,8 @@ router.put(
     if (!ticket) {
       throw new NotFoundError();
     }
-
+    console.log("usrID:" + ticket.userId)
+    console.log("currentUserID:" + req.currentUser!.id)
     if(ticket.userId !== req.currentUser!.id) {
         throw new NotAuthorizedError();
     }
@@ -31,6 +34,12 @@ router.put(
         price: req.body.price
     });
     await ticket.save();
+    new TicketUpdatedPublisher(natsWrapper.client).publish({
+      id: ticket.id,
+      title: ticket.title,
+      price: ticket.price,
+      userId: ticket.userId
+    })
 
     res.send(ticket)
   }
