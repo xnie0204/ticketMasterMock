@@ -6,7 +6,6 @@ declare global {
   var signin: () => string[];
 }
 
-
 jest.mock('../nats-wrappers')
 let mongo: any;
 beforeAll(async () => {
