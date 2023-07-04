@@ -1,85 +1,96 @@
 import request from "supertest";
 import { app } from "../../app";
-import { Ticket } from "../../models/ticket";
+import { Order, OrderStatus } from "../../models/order";
 import { natsWrapper } from "../../nats-wrappers";
+import mongoose from "mongoose";
+import { stripe } from "../../stripe";
+import { Payment } from "../../models/payments";
 
+jest.mock('../../stripe')
 
-
-it("has a route handler listening to /api/tickets for post requests", async () => {
-  const response = await request(app).post("/api/tickets").send({});
-  expect(response.status).not.toEqual(404);
-});
-
-it("it can only be accessed if the user is signed in", async () => {
-  await request(app).post("/api/tickets").send({}).expect(401);
-});
-
-it("returns a  status other than 401 if the user is signed in", async () => {
+it("returns 404 when order doesn't exsit", async () => {
   const response = await request(app)
-    .post("/api/tickets")
+    .post("/api/payments")
     .set("Cookie", global.signin())
-    .send({});
+    .send({token: 'asdefw', orderId: new mongoose.Types.ObjectId().toHexString()});
+  expect(response.status).toEqual(404);
+});
+
+it("returns a 401 when purchasing an order that doesn't belong to the user", async () => {
+    const order = Order.build({
+        id: new mongoose.Types.ObjectId().toHexString(),
+        userId: new mongoose.Types.ObjectId().toHexString(),
+        version: 0,
+        price: 20,
+        status: OrderStatus.Created
+    });
+    await order.save();
+
+    const response = await request(app)
+    .post("/api/payments")
+    .set("Cookie", global.signin())
+    .send({token: 'asdefw', orderId: order.id});
+  expect(response.status).toEqual(401);
+
+});
+
+it("return a 400 when purchasing a cancelled order", async () => {
+    const userId = new mongoose.Types.ObjectId().toHexString();
+
+    const order = Order.build({
+        id: new mongoose.Types.ObjectId().toHexString(),
+        userId,
+        version: 0,
+        price: 20,
+        status: OrderStatus.Cancelled
+    });
+    await order.save();
+
+  const response = await request(app)
+    .post("/api/payments")
+    .set("Cookie", global.signin(userId))
+    .send({
+        order: order.id,
+        token: 'asfefw'
+    });
 
   expect(response.status).not.toEqual(401);
 });
 
-it("returns an error if an invalid title is provided", async () => {
-  await request(app)
-    .post("/api/tickets")
-    .set("Cookie", global.signin())
-    .send({
-      title: "",
-      price: 10,
-    })
-    .expect(400);
+it('returns a 204 with valid inputs',async ()=> {
+    const userId = new mongoose.Types.ObjectId().toHexString();
 
-  await request(app)
-    .post("/api/tickets")
-    .set("Cookie", global.signin())
-    .send({
-      price: 10,
-    })
-    .expect(400);
-});
-
-it("returns an error if an invalid price is provided", async () => {
-  await request(app)
-    .post("/api/tickets")
-    .set("Cookie", global.signin())
-    .send({
-      title: "adddd",
-      price: -10,
-    })
-    .expect(400);
-
-  await request(app)
-    .post("/api/tickets")
-    .set("Cookie", global.signin())
-    .send({
-      title: "adddd",
-    })
-    .expect(400);
-});
-it("create a ticket with valid inputs ", async () => {
-    let tickets = await Ticket.find({});
-    expect(tickets.length).toEqual(0);
-
-    await request(app).post('/api/tickets').set('Cookie',global.signin()).send({
-        title: "adddd",
+    const order = Order.build({
+        id: new mongoose.Types.ObjectId().toHexString(),
+        userId,
+        version: 0,
         price: 20,
+        status: OrderStatus.Created
+    });
+    await order.save();
+
+    await request(app)
+    .post("/api/payments")
+    .set("Cookie", global.signin(userId))
+    .send({
+        order: order.id,
+        // a token always works in test mode
+        token: 'tok_visa',
+        orderId: order.id
     }).expect(201)
 
-    tickets = await Ticket.find({});
-    expect(tickets.length).toEqual(1);
-    expect(tickets[0].price).toEqual(20);
-});
+    const chargeOptions = (stripe.charges.create as jest.Mock).mock.calls[0][0]
 
-it('publish an event', async()=> {
-  const title = 'asldfj';
-  await request(app).post('/api/tickets').set('Cookie',global.signin()).send({
-    title,
-    price: 20,
-  }).expect(201);
+    expect(chargeOptions.source).toEqual('tok_visa');
+    expect(chargeOptions.amount).toEqual(20 * 100);
+    expect(chargeOptions.currency).toEqual('usd')
 
-  expect(natsWrapper.client.publish).toHaveBeenCalled();
+    const payment = await Payment.findOne({
+        orderId: order.id,
+    })
+
+    expect(payment).not.toBeNull();
+
 })
+
+
