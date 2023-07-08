@@ -2,6 +2,7 @@
 import { natsWrapper } from "./nats-wrappers";
 
 const start = async () => {
+  console.log("1234")
   if (!process.env.NATS_CLIENT_ID) {
     throw new Error("NATS_CLIENT_ID must be defined");
   }
