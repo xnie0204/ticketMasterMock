@@ -3,11 +3,11 @@ kind: Ingress
 metadata:
   name: ingress-service
   annotations:
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/use-regex: "true"
+    service.beta.kubernetes.io/do-loadbalancer-enable-proxy-protocol: 'true'
+    service.beta.kubernetes.io/do-loadbalancer-hostname: 'www.mock-ticketmaskter.lat'
 spec:
   rules:
-    - host: ticketing.dev
+    - host: www.mock-ticketmaskter.lat
       http:
         paths:
           - path: /api/payments/?(.*)
