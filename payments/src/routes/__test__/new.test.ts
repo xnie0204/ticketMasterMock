@@ -95,6 +95,8 @@ it("return a 400 when purchasing a cancelled order", async () => {
 
 // })
 it("returns a 201 with valid inputs", async () => {
+  console.log("JSEFSE+" + process.env.STRIPE_KEY)
+  console.log("JSEFSE+" + process.env.JWT_KEY)
   const userId = new mongoose.Types.ObjectId().toHexString();
   const price = Math.floor(Math.random() * 100000);
   const order = Order.build({

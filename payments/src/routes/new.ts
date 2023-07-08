@@ -40,7 +40,9 @@ router.post(
       currency: "usd",
       amount: order.price * 100,
       source: token,
-    });
+    }); 
+
+    console.log("chage+++++"+ charge)
     const payment = Payment.build({
       orderId,
       stripeId: charge.id,
