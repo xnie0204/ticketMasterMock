@@ -42,7 +42,7 @@ router.post(
       source: token,
     }); 
 
-    console.log("chage+++++"+ charge)
+  
     const payment = Payment.build({
       orderId,
       stripeId: charge.id,
